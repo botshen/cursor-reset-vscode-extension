@@ -4,7 +4,7 @@
   "description": "cursor-auto-free",
   "version": "0.0.1",
   "engines": {
-    "vscode": "^1.97.0"
+    "vscode": "^1.96.2"
   },
   "categories": [
     "Other"
@@ -17,7 +17,25 @@
         "command": "cursor-auto-free.helloWorld",
         "title": "Hello World"
       }
-    ]
+    ],
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "cursor-auto-free",
+          "title": "Cursor Auto Free",
+          "icon": "resources/icon.svg"
+        }
+      ]
+    },
+    "views": {
+      "cursor-auto-free": [
+        {
+          "type": "webview",
+          "id": "cursorAutoFreeView",
+          "name": "Cursor Auto Free"
+        }
+      ]
+    }
   },
   "scripts": {
     "vscode:prepublish": "pnpm run package",
@@ -34,7 +52,7 @@
     "test": "vscode-test"
   },
   "devDependencies": {
-    "@types/vscode": "^1.97.0",
+    "@types/vscode": "^1.96.2",
     "@types/mocha": "^10.0.10",
     "@types/node": "20.x",
     "@typescript-eslint/eslint-plugin": "^8.22.0",
