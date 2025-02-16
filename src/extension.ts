@@ -24,55 +24,93 @@ class SidebarProvider implements vscode.WebviewViewProvider {
 		webviewView.webview.onDidReceiveMessage(message => {
 			switch (message.command) {
 				case 'buttonClicked':
-					// 检查脚本是否已在运行
 					if (this.isScriptRunning) {
 						vscode.window.showInformationMessage('脚本正在执行中，请等待完成...');
 						return;
 					}
 					
 					this.isScriptRunning = true;
-					// 如果设备是不是mac，则不执行
-					if (process.platform !== 'darwin') {
-						vscode.window.showInformationMessage('当前设备不是mac，不执行脚本');
-						this.isScriptRunning = false;
-						return;
+					
+					// 获取基础URL
+					const baseUrl = 'https://aizaozao.com/accelerate.php/https://raw.githubusercontent.com/yuaotian/go-cursor-help/refs/heads/master/scripts/run';
+					let scriptUrl = '';
+					let executeCommand = '';
+
+					// 根据不同操作系统设置不同的脚本和执行命令
+					switch (process.platform) {
+						case 'darwin':
+							scriptUrl = `${baseUrl}/cursor_mac_id_modifier.sh`;
+							executeCommand = 'Terminal';
+							break;
+						case 'win32':
+							scriptUrl = `${baseUrl}/cursor_win_id_modifier.ps1`;
+							executeCommand = 'powershell';
+							break;
+						case 'linux':
+							scriptUrl = `${baseUrl}/cursor_linux_id_modifier.sh`;
+							executeCommand = 'gnome-terminal';
+							break;
+						default:
+							this.isScriptRunning = false;
+							vscode.window.showErrorMessage('不支持的操作系统');
+							return;
 					}
-					// 首先执行curl命令获取脚本内容
-					exec('curl -fsSL https://aizaozao.com/accelerate.php/https://raw.githubusercontent.com/yuaotian/go-cursor-help/refs/heads/master/scripts/run/cursor_mac_id_modifier.sh', (error, stdout, stderr) => {
+
+					// 获取脚本内容
+					exec(`curl -fsSL ${scriptUrl}`, (error, stdout, stderr) => {
 						if (error) {
 							this.isScriptRunning = false;
 							vscode.window.showErrorMessage('获取脚本失败：' + error.message);
 							return;
 						}
-						
-						// 将脚本内容写入临时文件，使用 Buffer 来正确处理内容
-						const tmpFile = '/tmp/cursor_script.sh';
-						require('fs').writeFileSync(tmpFile, stdout);
-						// 在重启Cursor之前添加清理钥匙串的命令
-						const restartCursor = `
-							security delete-generic-password -s "Cursor Safe Storage"
-							echo "清理钥匙串完成"
-							echo "即将打开Cursor"
- 							open -a "Cursor"
-						`;
-						require('fs').appendFileSync(tmpFile, restartCursor);
-						exec(`chmod +x ${tmpFile}`, (error) => {
-							if (error) {
-								this.isScriptRunning = false;
-								vscode.window.showErrorMessage('设置脚本权限失败：' + error.message);
-								return;
-							}
-							
-							// 打开终端并执行脚本
-							exec(`osascript -e 'tell application "Terminal" to activate' -e 'tell application "Terminal" to do script "sudo ${tmpFile}"'`, (error) => {
+
+						if (process.platform === 'win32') {
+							// Windows 使用 PowerShell 执行
+							exec(`powershell -Command "${stdout}"`, (error) => {
 								this.isScriptRunning = false;
 								if (error) {
 									vscode.window.showErrorMessage('执行脚本失败：' + error.message);
 									return;
 								}
-								vscode.window.showInformationMessage('脚本已在终端中启动！');
+								vscode.window.showInformationMessage('脚本执行完成！');
 							});
-						});
+						} else {
+							// Linux 和 macOS 使用 bash 执行
+							const tmpFile = '/tmp/cursor_script.sh';
+							require('fs').writeFileSync(tmpFile, stdout);
+							
+							if (process.platform === 'darwin') {
+								// macOS 特定的清理命令
+								const restartCursor = `
+									security delete-generic-password -s "Cursor Safe Storage"
+									echo "清理钥匙串完成"
+									echo "即将打开Cursor"
+									open -a "Cursor"
+								`;
+								require('fs').appendFileSync(tmpFile, restartCursor);
+							}
+
+							exec(`chmod +x ${tmpFile}`, (error) => {
+								if (error) {
+									this.isScriptRunning = false;
+									vscode.window.showErrorMessage('设置脚本权限失败：' + error.message);
+									return;
+								}
+
+								const terminalCommand = process.platform === 'darwin' 
+									? `osascript -e 'tell application "Terminal" to activate' -e 'tell application "Terminal" to do script "sudo ${tmpFile}"'`
+									: `${executeCommand} -- sudo ${tmpFile}`;
+
+								exec(terminalCommand, (error) => {
+									this.isScriptRunning = false;
+									if (error) {
+										vscode.window.showErrorMessage('执行脚本失败：' + error.message);
+										return;
+									}
+									vscode.window.showInformationMessage('脚本已在终端中启动！');
+								});
+							});
+						}
 					});
 					break;
 			}
